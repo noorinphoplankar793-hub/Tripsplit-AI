@@ -1,447 +1,348 @@
 import React, { useState } from 'react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'expenses', 'balance', 'itinerary', 'settings'
-  const [userName] = useState('Ayaan');
-  const [tripName, setTripName] = useState('Kasol Trip 2026');
-  const [members, setMembers] = useState('Farman, Zaid, Jack, Nathan');
-  const [aiLoading, setAiLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('Dashboard');
+  
+  // User & Trip Customization State
+  const [userName, setUserName] = useState('Ayaan');
+  const [destination, setDestination] = useState('Goa');
+  const [tripDays, setTripDays] = useState('5 Days');
+  const [memberCount, setMemberCount] = useState(4);
+  const [friendsList, setFriendsList] = useState(['Rahul', 'Ayesha', 'Priya', 'You']);
 
   // Expenses State
   const [expenses, setExpenses] = useState([
-    { id: 1, description: 'Hotel Stay & Resort', amount: 8500, payer: 'Farman' },
-    { id: 2, description: 'Food & Cafe Hopping', amount: 3200, payer: 'Zaid' },
-    { id: 3, description: 'Cab & Travel Charges', amount: 4100, payer: 'Jack' }
+    { id: 1, title: 'Hotel Booking', paidBy: 'Rahul', amount: 6000, date: 'May 20, 2025', icon: '🏨', bg: '#e0e7ff', color: '#4338ca' },
+    { id: 2, title: 'Dinner', paidBy: 'Ayesha', amount: 2400, date: 'May 20, 2025', icon: '🍴', bg: '#ffedd5', color: '#c2410c' },
+    { id: 3, title: 'Taxi', paidBy: 'You', amount: 1500, date: 'May 20, 2025', icon: '🚖', bg: '#d1fae5', color: '#047857' },
+    { id: 4, title: 'Entry Tickets', paidBy: 'Priya', amount: 1200, date: 'May 19, 2025', icon: '🎟️', bg: '#e0f2fe', color: '#0369a1' },
   ]);
-  const [description, setDescription] = useState('');
-  const [amount, setAmount] = useState('');
-  const [payer, setPayer] = useState('Farman');
 
   // Itinerary State
   const [itinerary, setItinerary] = useState([
-    { id: 1, day: 'Day 1', activity: 'Arrival in Kasol, Hotel Check-in & Evening Riverwalk' },
-    { id: 2, day: 'Day 2', activity: 'Trek to Chalal & Tosh Village Cafe Exploration' },
-    { id: 3, day: 'Day 3', activity: 'Manikaran Sahib Gurudwara Visit & Return Journey' }
+    { id: 1, time: '9:00 AM', title: 'Breakfast at Café', desc: 'Start your day with a relaxing breakfast ☕', icon: '☕', bg: '#f3e8ff', color: '#7e22ce' },
+    { id: 2, time: '11:00 AM', title: `Explore ${destination} Main Spots`, desc: 'Enjoy sightseeing & beach vibes 🏖️', icon: '🏖️', bg: '#e0f2fe', color: '#0284c7' },
+    { id: 3, time: '7:00 PM', title: 'Dinner & Nightlife', desc: `Explore ${destination}'s amazing nightlife ✨`, icon: '🎵', bg: '#fae8ff', color: '#c026d3' },
   ]);
-  const [dayInput, setDayInput] = useState('');
-  const [activityInput, setActivityInput] = useState('');
 
-  // AI Auto-Generator
-  const handleGenerateAI = () => {
-    if (!tripName.trim()) {
-      alert('Kripya pehle Trip Name bharein!');
-      return;
-    }
-    setAiLoading(true);
+  // AI Prompt Input State
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
 
-    const destination = tripName.replace(/trip|202\d|203\d/gi, '').trim() || tripName;
-    const firstMember = members.split(',')[0]?.trim() || 'Farman';
+  // New Expense Input State
+  const [newTitle, setNewTitle] = useState('');
+  const [newAmount, setNewAmount] = useState('');
+  const [newPayer, setNewPayer] = useState('You');
 
+  // Calculations
+  const totalExpenses = expenses.reduce((acc, curr) => acc + curr.amount, 0);
+  const perPersonShare = Math.round(totalExpenses / (memberCount || 1));
+
+  // AI Generation Handler
+  const handleGeneratePlan = () => {
+    setIsGenerating(true);
     setTimeout(() => {
-      const newItinerary = [
-        { id: Date.now() + 1, day: 'Day 1', activity: `Arrival in ${destination}, hotel check-in & local market tour` },
-        { id: Date.now() + 2, day: 'Day 2', activity: `Sightseeing, scenic points & famous cafes in ${destination}` },
-        { id: Date.now() + 3, day: 'Day 3', activity: `Souvenir shopping, local food tasting & departure prep` }
-      ];
-
-      const newExpenses = [
-        { id: Date.now() + 4, description: `${destination} Luxury Stay`, amount: 9500, payer: firstMember },
-        { id: Date.now() + 5, description: 'Local Transport & Cabs', amount: 3800, payer: firstMember }
-      ];
-
-      setItinerary(newItinerary);
-      setExpenses(newExpenses);
-      setAiLoading(false);
-      alert(`✨ AI ne ${destination} ke liye Naya Smart Itinerary & Expense Plan set kar diya hai!`);
+      setItinerary([
+        { id: Date.now() + 1, time: '9:00 AM', title: `Arrival in ${destination}`, desc: 'Check-in to resort & morning coffee ☕', icon: '☕', bg: '#f3e8ff', color: '#7e22ce' },
+        { id: Date.now() + 2, time: '1:00 PM', title: `${destination} Adventure Tour`, desc: 'Sightseeing, water sports & famous spots 🌊', icon: '🏖️', bg: '#e0f2fe', color: '#0284c7' },
+        { id: Date.now() + 3, time: '8:00 PM', title: 'Sunset Dinner', desc: `Special group dinner in ${destination} ✨`, icon: '🎵', bg: '#fae8ff', color: '#c026d3' }
+      ]);
+      setIsGenerating(false);
+      setAiPrompt('');
+      alert(`✨ AI Plan generated for ${destination}!`);
     }, 800);
   };
 
-  // Add Expense
+  // Add Expense Handler
   const handleAddExpense = (e) => {
     e.preventDefault();
-    if (!description || !amount || !payer) return;
-    setExpenses([...expenses, { id: Date.now(), description, amount: parseFloat(amount), payer }]);
-    setDescription('');
-    setAmount('');
+    if (!newTitle || !newAmount) return;
+    const newExp = {
+      id: Date.now(),
+      title: newTitle,
+      paidBy: newPayer,
+      amount: parseFloat(newAmount),
+      date: 'Today',
+      icon: '💸',
+      bg: '#e0e7ff',
+      color: '#4f46e5'
+    };
+    setExpenses([newExp, ...expenses]);
+    setNewTitle('');
+    setNewAmount('');
   };
-
-  const handleDeleteExpense = (id) => {
-    setExpenses(expenses.filter(exp => exp.id !== id));
-  };
-
-  // Add Itinerary
-  const handleAddItinerary = (e) => {
-    e.preventDefault();
-    if (!dayInput || !activityInput) return;
-    setItinerary([...itinerary, { id: Date.now(), day: dayInput, activity: activityInput }]);
-    setDayInput('');
-    setActivityInput('');
-  };
-
-  const handleDeleteItinerary = (id) => {
-    setItinerary(itinerary.filter(item => item.id !== id));
-  };
-
-  // Math Calculations
-  const totalExpense = expenses.reduce((acc, curr) => acc + curr.amount, 0);
-  const memberList = members.split(',').map(m => m.trim()).filter(Boolean);
-  const memberCount = memberList.length || 1;
-  const perPersonShare = totalExpense / memberCount;
-
-  const paidByMember = {};
-  memberList.forEach(m => { paidByMember[m] = 0; });
-  expenses.forEach(exp => {
-    if (paidByMember[exp.payer] !== undefined) {
-      paidByMember[exp.payer] += exp.amount;
-    } else {
-      paidByMember[exp.payer] = exp.amount;
-    }
-  });
 
   return (
-    <div style={{
-      display: 'flex',
-      minHeight: '100vh',
-      backgroundColor: '#f8fafc',
-      color: '#0f172a',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-    }}>
+    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f4f6fb', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
       
       {/* ---------------- LEFT SIDEBAR ---------------- */}
-      <aside style={{
-        width: '260px',
-        backgroundColor: '#0f172a',
-        color: '#f8fafc',
-        padding: '24px 16px',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-        boxSizing: 'border-box'
-      }}>
+      <aside style={{ width: '240px', backgroundColor: '#0b0f24', color: '#ffffff', padding: '24px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxSizing: 'border-box' }}>
         <div>
-          {/* Logo & Title */}
-          <div style={{ padding: '0 12px 24px 12px', borderBottom: '1px solid #334155', marginBottom: '24px' }}>
-            <div style={{ fontSize: '20px', fontWeight: '800', color: '#818cf8', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              ⚡ TripSplit AI
-            </div>
-            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>Smart Expense & Travel Hub</div>
+          {/* Logo */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '22px', fontWeight: '800', marginBottom: '32px', paddingLeft: '8px' }}>
+            <span style={{ color: '#38bdf8' }}>✈️</span> TripSplit
           </div>
 
-          {/* Navigation Menu */}
-          <nav style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {/* Nav Items */}
+          <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {[
-              { id: 'dashboard', label: '📊 Dashboard Overview', icon: '🏠' },
-              { id: 'expenses', label: '💸 Expense Tracker', icon: '💰' },
-              { id: 'balance', label: '⚖️ Settlement & Split', icon: '⚖️' },
-              { id: 'itinerary', label: '🗺️ Trip Itinerary', icon: '📍' },
-              { id: 'settings', label: '⚙️ Trip Settings & AI', icon: '🤖' }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '12px 16px',
-                  borderRadius: '10px',
-                  border: 'none',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  transition: 'all 0.2s',
-                  backgroundColor: activeTab === tab.id ? '#4f46e5' : 'transparent',
-                  color: activeTab === tab.id ? '#ffffff' : '#94a3b8'
-                }}
-              >
-                {tab.label}
-              </button>
-            ))}
+              { name: 'Dashboard', icon: '🏠' },
+              { name: 'Expenses', icon: '💳' },
+              { name: 'Itinerary', icon: '🗺️' },
+              { name: 'Friends', icon: '👥' }
+            ].map((item) => {
+              const isActive = activeTab === item.name;
+              return (
+                <button
+                  key={item.name}
+                  onClick={() => setActiveTab(item.name)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '12px 16px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    transition: 'all 0.2s',
+                    backgroundColor: isActive ? '#5850ec' : 'transparent',
+                    color: isActive ? '#ffffff' : '#94a3b8'
+                  }}
+                >
+                  <span style={{ fontSize: '16px' }}>{item.icon}</span> {item.name}
+                </button>
+              );
+            })}
           </nav>
         </div>
 
-        {/* User Card in Sidebar */}
-        <div style={{ backgroundColor: '#1e293b', padding: '14px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ width: '38px', height: '38px', borderRadius: '50%', backgroundColor: '#6366f1', color: '#fff', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            AY
-          </div>
-          <div>
-            <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>{userName}</div>
-            <div style={{ fontSize: '11px', color: '#94a3b8' }}>Admin / Organizer</div>
-          </div>
+        {/* Bottom AI Card */}
+        <div style={{
+          background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
+          padding: '18px 14px',
+          borderRadius: '16px',
+          textAlign: 'center',
+          position: 'relative',
+          overflow: 'hidden',
+          border: '1px solid #4338ca'
+        }}>
+          <div style={{ fontSize: '13px', fontWeight: '700', color: '#ffffff', marginBottom: '4px' }}>Smart Travel Planning</div>
+          <div style={{ fontSize: '11px', color: '#a5b4fc', marginBottom: '12px' }}>Powered by AI ✨</div>
+          <div style={{ fontSize: '32px' }}>🧳</div>
         </div>
       </aside>
 
       {/* ---------------- MAIN CONTENT AREA ---------------- */}
-      <main style={{ flex: 1, padding: '30px', overflowY: 'auto' }}>
+      <main style={{ flex: 1, padding: '28px 36px', overflowY: 'auto' }}>
         
-        {/* Top Bar Header */}
-        <header style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          backgroundColor: '#ffffff',
-          padding: '20px 28px',
-          borderRadius: '16px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
-          marginBottom: '28px'
-        }}>
+        {/* TOP BAR */}
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
           <div>
-            <span style={{ fontSize: '12px', fontWeight: '700', color: '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Current Trip Active
-            </span>
-            <h1 style={{ fontSize: '26px', fontWeight: '800', margin: '2px 0 0 0', color: '#0f172a' }}>
-              Hello, {userName}! 👋
-            </h1>
+            <div style={{ fontSize: '13px', color: '#64748b' }}>Welcome back, <strong style={{ color: '#0f172a' }}>{userName}</strong> 👋</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' }}>
+              <input 
+                type="text" 
+                value={destination} 
+                onChange={(e) => setDestination(e.target.value)}
+                style={{ fontSize: '28px', fontWeight: '800', color: '#0f172a', border: 'none', background: 'transparent', width: 'auto', outline: 'none', cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: '24px' }}>🌴</span>
+            </div>
           </div>
 
+          {/* User Profile Right Corner */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '12px', color: '#64748b' }}>Destination</div>
-              <strong style={{ fontSize: '15px', color: '#0f172a' }}>{tripName}</strong>
+            <div style={{ position: 'relative', cursor: 'pointer' }}>
+              <span style={{ fontSize: '20px' }}>🔔</span>
+              <span style={{ position: 'absolute', top: '-2px', right: '-2px', backgroundColor: '#ef4444', color: '#fff', fontSize: '10px', fontWeight: 'bold', width: '15px', height: '15px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>3</span>
             </div>
-            <div style={{ backgroundColor: '#e0e7ff', color: '#4338ca', padding: '8px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: '700' }}>
-              👥 {memberCount} Members
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: '#ffffff', padding: '6px 12px 6px 6px', borderRadius: '30px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
+              <div style={{ width: '34px', height: '34px', borderRadius: '50%', backgroundColor: '#4f46e5', color: '#fff', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>
+                {userName.charAt(0)}
+              </div>
+              <span style={{ fontSize: '14px', fontWeight: '600', color: '#1e293b' }}>{userName}</span>
+              <span style={{ fontSize: '10px', color: '#64748b' }}>▼</span>
             </div>
           </div>
         </header>
 
-        {/* TAB 1: DASHBOARD OVERVIEW */}
-        {activeTab === 'dashboard' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            
-            {/* Stat Cards Row */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '18px' }}>
-              <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-                <span style={{ fontSize: '12px', fontWeight: '600', color: '#64748b', display: 'block' }}>TOTAL EXPENSE</span>
-                <span style={{ fontSize: '26px', fontWeight: '800', color: '#059669', marginTop: '4px', display: 'block' }}>₹{totalExpense.toFixed(2)}</span>
-              </div>
-              <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-                <span style={{ fontSize: '12px', fontWeight: '600', color: '#64748b', display: 'block' }}>PER PERSON SHARE</span>
-                <span style={{ fontSize: '26px', fontWeight: '800', color: '#4f46e5', marginTop: '4px', display: 'block' }}>₹{perPersonShare.toFixed(2)}</span>
-              </div>
-              <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-                <span style={{ fontSize: '12px', fontWeight: '600', color: '#64748b', display: 'block' }}>ITINERARY DAYS</span>
-                <span style={{ fontSize: '26px', fontWeight: '800', color: '#0284c7', marginTop: '4px', display: 'block' }}>{itinerary.length} Days Plan</span>
-              </div>
+        {/* ---------------- 4 TOP STAT CARDS ---------------- */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '18px', marginBottom: '28px' }}>
+          
+          {/* Card 1: Total Expenses */}
+          <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '18px', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.02)', display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '14px', backgroundColor: '#f0f3ff', color: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>💼</div>
+            <div>
+              <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>Total Expenses</div>
+              <div style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a', margin: '2px 0' }}>₹{totalExpenses.toLocaleString()}</div>
+              <div style={{ fontSize: '11px', color: '#10b981', fontWeight: '700' }}>↗ 12% <span style={{ color: '#94a3b8', fontWeight: 'normal' }}>from last trip</span></div>
             </div>
-
-            {/* Quick Preview Section */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '20px' }}>
-              <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-                <h3 style={{ fontSize: '16px', fontWeight: '700', margin: '0 0 16px 0' }}>💸 Recent Expenses</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {expenses.slice(0, 3).map((exp) => (
-                    <div key={exp.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 12px', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
-                      <span style={{ fontSize: '14px', fontWeight: '600' }}>{exp.description}</span>
-                      <strong style={{ fontSize: '14px', color: '#059669' }}>₹{exp.amount}</strong>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-                <h3 style={{ fontSize: '16px', fontWeight: '700', margin: '0 0 16px 0' }}>🗺️ Upcoming Itinerary</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {itinerary.slice(0, 3).map((item) => (
-                    <div key={item.id} style={{ display: 'flex', gap: '10px', padding: '10px 12px', backgroundColor: '#f8fafc', borderRadius: '8px', alignItems: 'center' }}>
-                      <span style={{ fontSize: '11px', fontWeight: '700', backgroundColor: '#e0e7ff', color: '#4338ca', padding: '4px 8px', borderRadius: '6px' }}>{item.day}</span>
-                      <span style={{ fontSize: '13px', color: '#334155' }}>{item.activity}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
           </div>
-        )}
 
-        {/* TAB 2: EXPENSES */}
-        {activeTab === 'expenses' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <form onSubmit={handleAddExpense} style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: '700', margin: '0 0 16px 0' }}>➕ Add New Expense Entry</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '12px' }}>
-                <input 
-                  type="text" 
-                  placeholder="Expense Description (e.g. Dinner)" 
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  style={{ padding: '10px', border: '1px solid #cbd5e1', borderRadius: '8px' }}
-                />
-                <input 
-                  type="number" 
-                  placeholder="Amount (₹)" 
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  style={{ padding: '10px', border: '1px solid #cbd5e1', borderRadius: '8px' }}
-                />
-                <input 
-                  type="text" 
-                  placeholder="Paid by" 
-                  value={payer}
-                  onChange={(e) => setPayer(e.target.value)}
-                  style={{ padding: '10px', border: '1px solid #cbd5e1', borderRadius: '8px' }}
-                />
-                <button type="submit" style={{ backgroundColor: '#4f46e5', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}>
-                  + Add
-                </button>
-              </div>
-            </form>
+          {/* Card 2: Trip Members */}
+          <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '18px', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.02)', display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '14px', backgroundColor: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>👥</div>
+            <div>
+              <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>Trip Members</div>
+              <div style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a', margin: '2px 0' }}>{memberCount} People</div>
+              <div style={{ fontSize: '11px', color: '#4f46e5', fontWeight: '700', cursor: 'pointer' }}>View all members →</div>
+            </div>
+          </div>
 
-            <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-              <h3 style={{ fontSize: '18px', fontWeight: '700', margin: '0 0 16px 0' }}>📋 Expense Logs</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {expenses.map((exp) => (
-                  <div key={exp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc', padding: '14px 18px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+          {/* Card 3: Trip Duration */}
+          <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '18px', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.02)', display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '14px', backgroundColor: '#fffbe8', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>📅</div>
+            <div>
+              <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>Trip Duration</div>
+              <div style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a', margin: '2px 0' }}>{tripDays}</div>
+              <div style={{ fontSize: '11px', color: '#64748b' }}>Active Schedule</div>
+            </div>
+          </div>
+
+          {/* Card 4: Share / You Owe */}
+          <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '18px', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.02)', display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '14px', backgroundColor: '#f0f9ff', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>🍰</div>
+            <div>
+              <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>Per Person Share</div>
+              <div style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a', margin: '2px 0' }}>₹{perPersonShare.toLocaleString()}</div>
+              <div style={{ fontSize: '11px', color: '#0284c7', fontWeight: '700', cursor: 'pointer' }}>See settlements →</div>
+            </div>
+          </div>
+
+        </div>
+
+        {/* ---------------- MIDDLE SECTION: RECENT EXPENSES + AI PLANNER BANNER ---------------- */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px', marginBottom: '28px' }}>
+          
+          {/* Recent Expenses List */}
+          <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#0f172a', margin: 0 }}>Recent Expenses</h2>
+              <button 
+                onClick={() => {
+                  const title = prompt('Expense Name:');
+                  const amt = prompt('Amount (₹):');
+                  if (title && amt) {
+                    setExpenses([{ id: Date.now(), title, paidBy: 'You', amount: parseFloat(amt), date: 'Today', icon: '💳', bg: '#e0e7ff', color: '#4f46e5' }, ...expenses]);
+                  }
+                }}
+                style={{ backgroundColor: '#6366f1', color: '#ffffff', border: 'none', padding: '8px 16px', borderRadius: '10px', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}
+              >
+                + Add Expense
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {expenses.map((exp) => (
+                <div key={exp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{ width: '42px', height: '42px', borderRadius: '12px', backgroundColor: exp.bg, color: exp.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>
+                      {exp.icon}
+                    </div>
                     <div>
-                      <div style={{ fontSize: '15px', fontWeight: '600', color: '#1e293b' }}>{exp.description}</div>
-                      <div style={{ fontSize: '13px', color: '#64748b' }}>Paid by <span style={{ color: '#4f46e5', fontWeight: '600' }}>{exp.payer}</span></div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                      <span style={{ fontSize: '17px', fontWeight: '700', color: '#0f172a' }}>₹{exp.amount.toFixed(2)}</span>
-                      <button onClick={() => handleDeleteExpense(exp.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontWeight: 'bold' }}>✕</button>
+                      <div style={{ fontSize: '15px', fontWeight: '700', color: '#0f172a' }}>{exp.title}</div>
+                      <div style={{ fontSize: '12px', color: '#94a3b8' }}>Paid by {exp.paidBy}</div>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 3: BALANCE & SPLIT */}
-        {activeTab === 'balance' && (
-          <div style={{ backgroundColor: '#ffffff', padding: '28px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: '700', margin: '0 0 20px 0' }}>⚖️ Settlement & Equal Split Calculator</h3>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
-              <div style={{ backgroundColor: '#e0e7ff', padding: '18px', borderRadius: '12px' }}>
-                <span style={{ fontSize: '12px', color: '#4338ca', display: 'block', fontWeight: '600' }}>TOTAL COST</span>
-                <span style={{ fontSize: '24px', fontWeight: '800', color: '#3730a3' }}>₹{totalExpense.toFixed(2)}</span>
-              </div>
-              <div style={{ backgroundColor: '#d1fae5', padding: '18px', borderRadius: '12px' }}>
-                <span style={{ fontSize: '12px', color: '#065f46', display: 'block', fontWeight: '600' }}>INDIVIDUAL SHARE</span>
-                <span style={{ fontSize: '24px', fontWeight: '800', color: '#047857' }}>₹{perPersonShare.toFixed(2)}</span>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {Object.keys(paidByMember).map((person, idx) => {
-                const paid = paidByMember[person];
-                const balance = paid - perPersonShare;
-                const isGetsBack = balance >= 0;
-
-                return (
-                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <div>
-                      <strong style={{ fontSize: '16px', color: '#0f172a' }}>{person}</strong>
-                      <div style={{ fontSize: '13px', color: '#64748b' }}>Total Paid: ₹{paid.toFixed(2)}</div>
-                    </div>
-                    <span style={{ fontSize: '15px', fontWeight: '700', color: isGetsBack ? '#059669' : '#dc2626' }}>
-                      {isGetsBack ? `Gets back ₹${balance.toFixed(2)}` : `Owes ₹${Math.abs(balance).toFixed(2)}`}
-                    </span>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>₹{exp.amount.toLocaleString()}</div>
+                    <div style={{ fontSize: '11px', color: '#94a3b8' }}>{exp.date}</div>
                   </div>
-                );
-              })}
+                </div>
+              ))}
+            </div>
+
+            <div style={{ textAlign: 'center', marginTop: '20px', paddingTop: '14px', borderTop: '1px solid #f1f5f9' }}>
+              <span style={{ fontSize: '13px', fontWeight: '700', color: '#4f46e5', cursor: 'pointer' }}>View all expenses →</span>
             </div>
           </div>
-        )}
 
-        {/* TAB 4: ITINERARY */}
-        {activeTab === 'itinerary' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <form onSubmit={handleAddItinerary} style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: '700', margin: '0 0 16px 0' }}>📌 Add Custom Activity</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: '12px' }}>
-                <input 
-                  type="text" 
-                  placeholder="Day (e.g. Day 1)" 
-                  value={dayInput}
-                  onChange={(e) => setDayInput(e.target.value)}
-                  style={{ padding: '10px', border: '1px solid #cbd5e1', borderRadius: '8px' }}
-                />
-                <input 
-                  type="text" 
-                  placeholder="Activity / Place to visit" 
-                  value={activityInput}
-                  onChange={(e) => setActivityInput(e.target.value)}
-                  style={{ padding: '10px', border: '1px solid #cbd5e1', borderRadius: '8px' }}
-                />
-                <button type="submit" style={{ backgroundColor: '#4f46e5', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}>
-                  + Add Plan
-                </button>
+          {/* AI PLANNER BANNER */}
+          <div style={{
+            background: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)',
+            padding: '28px',
+            borderRadius: '24px',
+            color: '#ffffff',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            position: 'relative'
+          }}>
+            <div>
+              <div style={{ display: 'inline-block', backgroundColor: 'rgba(255,255,255,0.2)', padding: '4px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: '700', letterSpacing: '0.5px', marginBottom: '16px' }}>
+                ✨ AI PLANNER
               </div>
-            </form>
-
-            <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-              <h3 style={{ fontSize: '18px', fontWeight: '700', margin: '0 0 16px 0' }}>🗺️ Itinerary Schedule</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {itinerary.map((item) => (
-                  <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc', padding: '14px 18px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                      <div style={{ backgroundColor: '#e0e7ff', color: '#4338ca', fontWeight: '700', padding: '6px 12px', borderRadius: '8px', fontSize: '13px' }}>
-                        {item.day}
-                      </div>
-                      <div style={{ fontSize: '15px', color: '#1e293b', fontWeight: '500' }}>
-                        {item.activity}
-                      </div>
-                    </div>
-                    <button onClick={() => handleDeleteItinerary(item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontWeight: 'bold' }}>✕</button>
-                  </div>
-                ))}
-              </div>
+              <h2 style={{ fontSize: '24px', fontWeight: '800', margin: '0 0 8px 0' }}>Your Smart Travel Assistant</h2>
+              <p style={{ fontSize: '13px', color: '#e0e7ff', margin: 0, lineHeight: '1.5' }}>
+                Get personalized travel suggestions, optimized itineraries and smart expense insights for <strong>{destination}</strong>.
+              </p>
             </div>
-          </div>
-        )}
 
-        {/* TAB 5: SETTINGS & AI */}
-        {activeTab === 'settings' && (
-          <div style={{ backgroundColor: '#ffffff', padding: '28px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: '700', margin: '0 0 20px 0' }}>⚙️ Trip Configuration & AI Planner</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '500px' }}>
-              <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#64748b', display: 'block', marginBottom: '6px' }}>Trip / Destination Name</label>
+            <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', backgroundColor: '#ffffff', borderRadius: '12px', padding: '4px 6px 4px 14px', alignItems: 'center' }}>
                 <input 
                   type="text" 
-                  value={tripName} 
-                  onChange={(e) => setTripName(e.target.value)}
-                  style={{ width: '100%', padding: '11px', border: '1px solid #cbd5e1', borderRadius: '8px', boxSizing: 'border-box' }}
+                  placeholder={`Ask TripSplit AI anything about ${destination}...`}
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  style={{ flex: 1, border: 'none', outline: 'none', fontSize: '13px', color: '#0f172a' }}
                 />
-              </div>
-              <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#64748b', display: 'block', marginBottom: '6px' }}>Group Members (Comma Separated)</label>
-                <input 
-                  type="text" 
-                  value={members} 
-                  onChange={(e) => setMembers(e.target.value)}
-                  style={{ width: '100%', padding: '11px', border: '1px solid #cbd5e1', borderRadius: '8px', boxSizing: 'border-box' }}
-                />
-              </div>
-
-              <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '16px', marginTop: '10px' }}>
                 <button 
-                  type="button"
-                  onClick={handleGenerateAI}
-                  disabled={aiLoading}
-                  style={{
-                    width: '100%',
-                    backgroundColor: '#0284c7',
-                    color: '#ffffff',
-                    border: 'none',
-                    padding: '12px',
-                    borderRadius: '10px',
-                    fontWeight: '700',
-                    fontSize: '14px',
-                    cursor: 'pointer'
-                  }}
+                  onClick={handleGeneratePlan}
+                  style={{ backgroundColor: '#6366f1', border: 'none', color: '#fff', borderRadius: '8px', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 >
-                  {aiLoading ? '✨ Generating Smart Plan...' : '✨ Auto-Generate AI Itinerary & Expenses'}
+                  ➤
                 </button>
               </div>
+
+              <button 
+                onClick={handleGeneratePlan}
+                disabled={isGenerating}
+                style={{
+                  width: '100%',
+                  backgroundColor: '#ffffff',
+                  color: '#4338ca',
+                  border: 'none',
+                  padding: '12px',
+                  borderRadius: '12px',
+                  fontWeight: '700',
+                  fontSize: '14px',
+                  cursor: 'pointer'
+                }}
+              >
+                {isGenerating ? 'Generating Plan...' : 'Generate Today\'s Plan ✨'}
+              </button>
             </div>
           </div>
-        )}
+
+        </div>
+
+        {/* ---------------- BOTTOM SECTION: TODAY'S ITINERARY TIMELINE ---------------- */}
+        <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#0f172a', margin: 0 }}>Today's Itinerary</h2>
+            <span style={{ fontSize: '13px', fontWeight: '700', color: '#4f46e5', cursor: 'pointer' }}>View Full Plan →</span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
+            {itinerary.map((item) => (
+              <div key={item.id} style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', backgroundColor: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
+                <div style={{ width: '44px', height: '44px', borderRadius: '12px', backgroundColor: item.bg, color: item.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>
+                  {item.icon}
+                </div>
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: '700', color: '#4f46e5', marginBottom: '2px' }}>{item.time}</div>
+                  <div style={{ fontSize: '15px', fontWeight: '700', color: '#0f172a', marginBottom: '4px' }}>{item.title}</div>
+                  <div style={{ fontSize: '12px', color: '#64748b' }}>{item.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
 
       </main>
     </div>
