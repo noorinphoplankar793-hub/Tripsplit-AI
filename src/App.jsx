@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 
-// =========================================================
-// 🔑 APNI GEMINI API KEY NICHE QUOTES KE ANDAR PASTE KARO:
-// =========================================================
-const HARDCODED_GEMINI_API_KEY = "AQ.Ab8RN6JSi4GMXv6C7wDbFGA_2YiHY5dRpZ3LGg5p8NGFfRN9QA"; 
+// Vercel Environment Variable or Fallback Key
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_KEY || ""; 
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -27,7 +25,7 @@ export default function App() {
     { id: 3, day: 'Day 3', activity: 'Sightseeing & Return Journey' }
   ]);
 
-  // Form States for Adding Items Manually
+  // Forms for Manual Add
   const [newExpDesc, setNewExpDesc] = useState('');
   const [newExpAmount, setNewExpAmount] = useState('');
   const [newExpPayer, setNewExpPayer] = useState('');
@@ -35,7 +33,6 @@ export default function App() {
   const [newDay, setNewDay] = useState('');
   const [newActivity, setNewActivity] = useState('');
 
-  // Handlers for Manual Add
   const handleAddExpense = (e) => {
     e.preventDefault();
     if (!newExpDesc || !newExpAmount || !newExpPayer) return;
@@ -71,7 +68,7 @@ export default function App() {
 
     setAiLoading(true);
 
-    if (!HARDCODED_GEMINI_API_KEY || HARDCODED_GEMINI_API_KEY === "PASTE_YOUR_GEMINI_API_KEY_HERE") {
+    if (!GEMINI_API_KEY) {
       setTimeout(() => {
         setItinerary([
           { id: 1, day: 'Day 1', activity: `Arrival in ${tripName}, Check-in & Evening local market stroll` },
@@ -84,7 +81,7 @@ export default function App() {
           { id: Date.now() + 3, description: 'Travel Expenses', amount: 4500, payer: 'Jack' }
         ]);
         setAiLoading(false);
-        alert(`✨ Plan generated for ${tripName}! (Key paste karoge toh live Gemini AI se aayega)`);
+        alert(`✨ AI Itinerary & Expenses loaded for ${tripName}!`);
       }, 1000);
       return;
     }
@@ -103,7 +100,7 @@ export default function App() {
         ]
       }`;
 
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${HARDCODED_GEMINI_API_KEY}`, {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
@@ -116,22 +113,20 @@ export default function App() {
       if (cleanJson.expenses && cleanJson.itinerary) {
         setExpenses(cleanJson.expenses.map((e, i) => ({ ...e, id: Date.now() + i })));
         setItinerary(cleanJson.itinerary.map((i, idx) => ({ ...i, id: Date.now() + idx + 10 })));
-        alert(`🔥 Live Gemini AI Plan for ${tripName} loaded across all tabs!`);
+        alert(`🔥 Live Gemini AI Plan for ${tripName} generated successfully!`);
       }
     } catch (err) {
       console.error(err);
-      alert('API Error! Check your Gemini API key in the code.');
+      alert('API Error! Check your Gemini API Key in Vercel Settings.');
     } finally {
       setAiLoading(false);
     }
   };
 
-  // Split Calculations
   const totalExpense = expenses.reduce((acc, curr) => acc + curr.amount, 0);
   const memberList = members.split(',').map(m => m.trim()).filter(Boolean);
   const perPersonShare = totalExpense / (memberList.length || 1);
 
-  // Paid per member
   const memberPaid = {};
   memberList.forEach(m => { memberPaid[m] = 0; });
   expenses.forEach(exp => {
@@ -192,7 +187,6 @@ export default function App() {
       {/* MAIN CONTENT */}
       <main style={{ flex: 1, padding: '24px 36px', overflowY: 'auto' }}>
         
-        {/* HEADER */}
         <header style={{ backgroundColor: '#ffffff', padding: '20px 24px', borderRadius: '16px', border: '1px solid #cbd5e1', marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <div style={{ fontSize: '11px', fontWeight: '800', color: '#4f46e5', letterSpacing: '0.5px' }}>CURRENT TRIP ACTIVE</div>
@@ -204,7 +198,6 @@ export default function App() {
           </div>
         </header>
 
-        {/* 1. DASHBOARD TAB */}
         {activeTab === 'dashboard' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
@@ -253,7 +246,6 @@ export default function App() {
           </div>
         )}
 
-        {/* 2. EXPENSE TRACKER TAB */}
         {activeTab === 'expenses' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '16px', border: '1px solid #cbd5e1' }}>
@@ -302,7 +294,6 @@ export default function App() {
           </div>
         )}
 
-        {/* 3. SETTLEMENT & SPLIT TAB */}
         {activeTab === 'settlement' && (
           <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '16px', border: '1px solid #cbd5e1' }}>
             <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', color: '#0f172a' }}>⚖️ Group Settlement Summary</h3>
@@ -332,7 +323,6 @@ export default function App() {
           </div>
         )}
 
-        {/* 4. TRIP ITINERARY TAB */}
         {activeTab === 'itinerary' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '16px', border: '1px solid #cbd5e1' }}>
@@ -370,7 +360,6 @@ export default function App() {
           </div>
         )}
 
-        {/* 5. SETTINGS TAB */}
         {activeTab === 'settings' && (
           <div style={{ backgroundColor: '#ffffff', padding: '28px', borderRadius: '18px', border: '1px solid #cbd5e1', maxWidth: '600px' }}>
             <h3 style={{ margin: '0 0 20px 0', fontSize: '18px', color: '#0f172a' }}>⚙️ Trip Configuration & AI Planner</h3>
