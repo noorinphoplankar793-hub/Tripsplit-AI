@@ -1,20 +1,28 @@
-import React, { useState } from 'react';
-
-// =========================================================
-// 🔑 APNI GEMINI API KEY NICHE QUOTES KE ANDAR PASTE KARO:
-// =========================================================
-const HARDCODED_GEMINI_API_KEY = "AQ.Ab8RN6JSi4GMXv6C7wDbFGA_2YiHY5dRpZ3LGg5p8NGFfRN9QA"; 
+import React, { useState, useEffect } from 'react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [userName] = useState('Ayaan');
   
+  // 🔑 PERSISTENT API KEY
+  const [apiKey, setApiKey] = useState(() => {
+    return localStorage.getItem('gemini_api_key') || '';
+  });
+
   // Trip State
   const [tripName, setTripName] = useState('Kasol Trip 2026');
   const [members, setMembers] = useState('Farman, Zaid, Jack, Nathan');
   const [aiLoading, setAiLoading] = useState(false);
   const [nlLoading, setNlLoading] = useState(false);
   const [naturalText, setNaturalText] = useState('');
+
+  // OCR Receipt/PDF State
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [receiptPreview, setReceiptPreview] = useState(null);
+
+  useEffect(() => {
+    localStorage.setItem('gemini_api_key', apiKey);
+  }, [apiKey]);
 
   // Data State
   const [expenses, setExpenses] = useState([
@@ -68,15 +76,14 @@ export default function App() {
     setNewActivity('');
   };
 
-  // 🚀 FEATURE 10 & 6: NATURAL LANGUAGE & AUTO-CATEGORIZATION VIA GEMINI AI
+  // NATURAL LANGUAGE AI ENTRY
   const handleNaturalLanguageExpense = async (e) => {
     e.preventDefault();
     if (!naturalText.trim()) return;
 
     setNlLoading(true);
 
-    if (!HARDCODED_GEMINI_API_KEY || HARDCODED_GEMINI_API_KEY === "PASTE_YOUR_GEMINI_API_KEY_HERE") {
-      // Fallback simulation if no API key is provided yet
+    if (!apiKey) {
       setTimeout(() => {
         setExpenses([...expenses, {
           id: Date.now(),
@@ -87,7 +94,7 @@ export default function App() {
         }]);
         setNaturalText('');
         setNlLoading(false);
-        alert('✨ Expense added via Smart Parser!');
+        alert('✨ Expense added! (Tip: Add your Gemini API key in Settings for real AI parsing)');
       }, 800);
       return;
     }
@@ -103,7 +110,7 @@ export default function App() {
         "category": "One of: Food, Transport, Lodging, Activities, General"
       }`;
 
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${HARDCODED_GEMINI_API_KEY}`, {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
@@ -126,13 +133,91 @@ export default function App() {
       }
     } catch (err) {
       console.error(err);
-      alert('AI Parsing Error! Please check your API key or write a clearer sentence.');
+      alert('AI Parsing Error! Please check your API key.');
     } finally {
       setNlLoading(false);
     }
   };
 
-  // AUTO GEMINI AI TRIP PLANNER FUNCTION
+  // 📸 OCR RECEIPT / BILL SCANNER VIA GEMINI VISION
+  const handleReceiptUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Preview image
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setReceiptPreview(reader.result);
+    };
+    reader.readAsDataURL(file);
+
+    if (!apiKey) {
+      alert('⚠️ Please add your Gemini API Key in the Settings tab first to use AI Receipt OCR scanning!');
+      return;
+    }
+
+    setOcrLoading(true);
+
+    try {
+      // Convert file to Base64
+      const base64Data = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result.split(',')[1]);
+        r.onerror = error => reject(error);
+        r.readAsDataURL(file);
+      });
+
+      const prompt = `Analyze this receipt/invoice image. Extract the total bill amount and a short description (like restaurant name or items). 
+      The valid group members who could have paid are: ${memberList.join(', ')}. Guess the payer if mentioned or default to "${memberList[0]}".
+      Return ONLY a raw JSON object with this exact schema (no markdown, no backticks):
+      {
+        "description": "Store or item name",
+        "amount": 00.0,
+        "payer": "${memberList[0]}",
+        "category": "One of: Food, Transport, Lodging, Activities, General"
+      }`;
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: prompt },
+              {
+                inline_data: {
+                  mime_type: file.type || 'image/jpeg',
+                  data: base64Data
+                }
+              }
+            ]
+          }]
+        })
+      });
+
+      const data = await res.json();
+      const rawText = data.candidates[0].content.parts[0].text;
+      const cleanJson = JSON.parse(rawText.replace(/```json|```/g, '').trim());
+
+      if (cleanJson.amount) {
+        setExpenses(prev => [...prev, {
+          id: Date.now(),
+          description: cleanJson.description || 'Scanned Receipt',
+          amount: parseFloat(cleanJson.amount) || 0,
+          payer: cleanJson.payer || memberList[0],
+          category: cleanJson.category || 'Food'
+        }]);
+        alert(`🎉 Receipt Scanned Successfully!\nAdded: ${cleanJson.description} - ₹${cleanJson.amount}`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('OCR Scanning failed! Make sure the image is clear and API key is correct.');
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
+  // AUTO GEMINI AI TRIP PLANNER
   const handleGenerateAI = async () => {
     if (!tripName.trim()) {
       alert('Pehle Destination / Trip Name daalo!');
@@ -141,7 +226,7 @@ export default function App() {
 
     setAiLoading(true);
 
-    if (!HARDCODED_GEMINI_API_KEY || HARDCODED_GEMINI_API_KEY === "PASTE_YOUR_GEMINI_API_KEY_HERE") {
+    if (!apiKey) {
       setTimeout(() => {
         setItinerary([
           { id: 1, day: 'Day 1', activity: `Arrival in ${tripName}, Check-in & Evening local market stroll` },
@@ -154,7 +239,7 @@ export default function App() {
           { id: Date.now() + 3, description: 'Travel Expenses', amount: 4500, payer: 'Jack', category: 'Transport' }
         ]);
         setAiLoading(false);
-        alert(`✨ Plan generated for ${tripName}!`);
+        alert(`✨ Plan generated for ${tripName}! (Add API key in Settings for live AI generations)`);
       }, 1000);
       return;
     }
@@ -173,7 +258,7 @@ export default function App() {
         ]
       }`;
 
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${HARDCODED_GEMINI_API_KEY}`, {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
@@ -190,7 +275,7 @@ export default function App() {
       }
     } catch (err) {
       console.error(err);
-      alert('API Error! Check your Gemini API key.');
+      alert('API Error! Check your Gemini API key in Settings.');
     } finally {
       setAiLoading(false);
     }
@@ -210,16 +295,16 @@ export default function App() {
   });
 
   return (
-    <div className="app-container" style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#e2e8f0', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
+    <div className="app-container" style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#090d16', color: '#f1f5f9', fontFamily: 'Inter, system-ui, -apple-system, sans-serif' }}>
       
       <style>{`
         .sidebar {
-          width: 260px;
-          background-color: #1a1f2c;
-          color: #fff;
+          width: 270px;
+          background: linear-gradient(180deg, #111827 0%, #0d1322 100%);
+          border-right: 1px solid rgba(255, 255, 255, 0.08);
           display: flex;
           flex-direction: column;
-          padding: 24px 16px;
+          padding: 28px 20px;
           box-sizing: border-box;
           flex-shrink: 0;
         }
@@ -229,12 +314,46 @@ export default function App() {
           flex-direction: column;
           height: 100vh;
           overflow-y: auto;
+          background: radial-gradient(circle at top right, #1e1b4b 0%, #090d16 50%);
+        }
+        .glass-card {
+          background: rgba(17, 24, 39, 0.7);
+          backdrop-filter: blur(12px);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 16px;
+          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+        }
+        .custom-input {
+          background: rgba(15, 23, 42, 0.6) !important;
+          border: 1px solid rgba(255, 255, 255, 0.12) !important;
+          color: #fff !important;
+          border-radius: 10px !important;
+          transition: all 0.2s ease;
+        }
+        .custom-input:focus {
+          border-color: #6366f1 !important;
+          box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2) !important;
+          outline: none;
+        }
+        .nav-btn {
+          padding: 12px 16px;
+          border-radius: 12px;
+          border: none;
+          text-align: left;
+          font-weight: 600;
+          font-size: 13px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .nav-btn:hover {
+          background: rgba(255, 255, 255, 0.05);
+          color: #fff;
         }
         .desktop-nav {
           display: flex;
           flex-direction: column;
           gap: 8px;
-          margin-top: 24px;
+          margin-top: 28px;
         }
         .mobile-nav {
           display: none;
@@ -258,8 +377,9 @@ export default function App() {
             display: flex !important;
             gap: 6px;
             overflow-x: auto;
-            background: #1a1f2c;
+            background: #111827;
             padding: 8px 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
           }
           .main-content-area {
             height: auto !important;
@@ -270,8 +390,8 @@ export default function App() {
       {/* SIDEBAR */}
       <aside className="sidebar">
         <div>
-          <div style={{ fontSize: '20px', fontWeight: '800', color: '#ff6b00' }}>⚡ TripSplit AI</div>
-          <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Smart Expense & Travel Hub</div>
+          <div style={{ fontSize: '22px', fontWeight: '900', background: 'linear-gradient(90deg, #ff7e5f, #feb47b)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>⚡ TripSplit AI</div>
+          <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px', letterSpacing: '0.5px' }}>Next-Gen Travel & Expense Hub</div>
         </div>
 
         <div className="desktop-nav">
@@ -280,22 +400,16 @@ export default function App() {
             { id: 'expenses', label: '💸 Expense Tracker & AI' },
             { id: 'settlement', label: '⚖️ Settlement & Split' },
             { id: 'itinerary', label: '🗺️ Trip Itinerary' },
-            { id: 'settings', label: '⚙️ Trip Settings & AI' }
+            { id: 'settings', label: '⚙️ API Key & Settings' }
           ].map(tab => (
             <button 
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
+              className="nav-btn"
               style={{
-                padding: '12px 16px',
-                borderRadius: '10px',
-                border: 'none',
-                textAlign: 'left',
-                fontWeight: '600',
-                fontSize: '13px',
-                cursor: 'pointer',
                 backgroundColor: activeTab === tab.id ? '#4f46e5' : 'transparent',
-                color: activeTab === tab.id ? '#ffffff' : '#cbd5e1',
-                transition: '0.2s'
+                color: activeTab === tab.id ? '#ffffff' : '#94a3b8',
+                boxShadow: activeTab === tab.id ? '0 4px 12px rgba(79, 70, 229, 0.4)' : 'none'
               }}
             >
               {tab.label}
@@ -324,8 +438,8 @@ export default function App() {
               fontWeight: '600',
               fontSize: '12px',
               cursor: 'pointer',
-              backgroundColor: activeTab === tab.id ? '#4f46e5' : '#2d3748',
-              color: activeTab === tab.id ? '#ffffff' : '#cbd5e1'
+              backgroundColor: activeTab === tab.id ? '#4f46e5' : '#1f2937',
+              color: activeTab === tab.id ? '#ffffff' : '#94a3b8'
             }}
           >
             {tab.label}
@@ -334,60 +448,109 @@ export default function App() {
       </nav>
 
       {/* MAIN CONTENT */}
-      <main className="main-content-area" style={{ padding: '24px', boxSizing: 'border-box' }}>
+      <main className="main-content-area" style={{ padding: '28px', boxSizing: 'border-box' }}>
         
-        <div style={{ backgroundColor: '#ffffff', padding: '18px 24px', borderRadius: '14px', border: '1px solid #cbd5e1', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+        {/* HEADER BAR */}
+        <div className="glass-card" style={{ padding: '20px 24px', marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ fontSize: '11px', fontWeight: '800', color: '#4f46e5', letterSpacing: '0.5px' }}>WORKSPACE</div>
-            <h2 style={{ margin: '4px 0 0 0', fontSize: '22px', fontWeight: '800', color: '#0f172a' }}>Hello, {userName}! 👋</h2>
+            <div style={{ fontSize: '11px', fontWeight: '800', color: '#818cf8', letterSpacing: '1px' }}>WORKSPACE</div>
+            <h2 style={{ margin: '4px 0 0 0', fontSize: '24px', fontWeight: '800', color: '#fff' }}>Hello, {userName}! 👋</h2>
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>Current Project Trip</span>
-            <span style={{ fontSize: '15px', fontWeight: '700', color: '#0f172a' }}>{tripName}</span>
+          <div style={{ textAlign: 'right', background: 'rgba(99, 102, 241, 0.1)', padding: '8px 14px', borderRadius: '12px', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
+            <span style={{ fontSize: '10px', color: '#94a3b8', display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Active Trip</span>
+            <span style={{ fontSize: '15px', fontWeight: '700', color: '#a5b4fc' }}>{tripName}</span>
           </div>
         </div>
 
         {/* 1. DASHBOARD */}
         {activeTab === 'dashboard' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            
+            {/* QUICK TRIP SETUP CARD */}
+            <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', color: '#fff', fontWeight: '700' }}>🚀 Trip Quick Setup & AI Generator</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', display: 'block', marginBottom: '6px' }}>Destination / Trip Name</label>
+                  <input 
+                    type="text" 
+                    value={tripName} 
+                    onChange={(e) => setTripName(e.target.value)}
+                    className="custom-input"
+                    style={{ width: '100%', padding: '12px', boxSizing: 'border-box', fontSize: '13px' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', display: 'block', marginBottom: '6px' }}>Group Members (Comma Separated)</label>
+                  <input 
+                    type="text" 
+                    value={members} 
+                    onChange={(e) => setMembers(e.target.value)}
+                    className="custom-input"
+                    style={{ width: '100%', padding: '12px', boxSizing: 'border-box', fontSize: '13px' }}
+                  />
+                </div>
+              </div>
+              <button 
+                onClick={handleGenerateAI}
+                disabled={aiLoading}
+                style={{
+                  background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '12px 20px',
+                  borderRadius: '10px',
+                  fontWeight: '700',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  width: 'fit-content',
+                  boxShadow: '0 4px 12px rgba(14, 165, 233, 0.4)'
+                }}
+              >
+                {aiLoading ? '✨ Generating Smart Plan...' : '✨ Auto-Generate AI Itinerary & Budget'}
+              </button>
+            </div>
+
+            {/* METRICS STATS */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
-              <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '14px', border: '1px solid #cbd5e1' }}>
-                <span style={{ fontSize: '11px', fontWeight: '700', color: '#64748b' }}>TOTAL EXPENSE</span>
-                <h2 style={{ fontSize: '26px', color: '#059669', margin: '6px 0 0 0' }}>₹{totalExpense.toFixed(2)}</h2>
+              <div className="glass-card" style={{ padding: '20px' }}>
+                <span style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', letterSpacing: '0.5px' }}>TOTAL EXPENSE</span>
+                <h2 style={{ fontSize: '28px', color: '#34d399', margin: '6px 0 0 0', fontWeight: '800' }}>₹{totalExpense.toFixed(2)}</h2>
               </div>
-              <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '14px', border: '1px solid #cbd5e1' }}>
-                <span style={{ fontSize: '11px', fontWeight: '700', color: '#64748b' }}>PER PERSON SHARE</span>
-                <h2 style={{ fontSize: '26px', color: '#4f46e5', margin: '6px 0 0 0' }}>₹{perPersonShare.toFixed(2)}</h2>
+              <div className="glass-card" style={{ padding: '20px' }}>
+                <span style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', letterSpacing: '0.5px' }}>PER PERSON SHARE</span>
+                <h2 style={{ fontSize: '28px', color: '#818cf8', margin: '6px 0 0 0', fontWeight: '800' }}>₹{perPersonShare.toFixed(2)}</h2>
               </div>
-              <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '14px', border: '1px solid #cbd5e1' }}>
-                <span style={{ fontSize: '11px', fontWeight: '700', color: '#64748b' }}>TOTAL ITINERARY DAYS</span>
-                <h2 style={{ fontSize: '26px', color: '#0284c7', margin: '6px 0 0 0' }}>{itinerary.length} Days</h2>
+              <div className="glass-card" style={{ padding: '20px' }}>
+                <span style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', letterSpacing: '0.5px' }}>TOTAL ITINERARY DAYS</span>
+                <h2 style={{ fontSize: '28px', color: '#38bdf8', margin: '6px 0 0 0', fontWeight: '800' }}>{itinerary.length} Days</h2>
               </div>
             </div>
 
+            {/* RECENT RECORDS */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
-              <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '14px', border: '1px solid #cbd5e1' }}>
-                <h3 style={{ margin: '0 0 14px 0', fontSize: '16px', color: '#0f172a' }}>💸 Recent Expenses</h3>
+              <div className="glass-card" style={{ padding: '20px' }}>
+                <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', color: '#fff', fontWeight: '700' }}>💸 Recent Expenses</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {expenses.slice(-4).map(exp => (
-                    <div key={exp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
+                    <div key={exp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                       <div>
-                        <div style={{ fontSize: '14px', fontWeight: '700', color: '#1e293b' }}>{exp.description}</div>
-                        <div style={{ fontSize: '11px', color: '#64748b' }}>Paid by {exp.payer} • <span style={{ color: '#4f46e5', fontWeight: '600' }}>{exp.category}</span></div>
+                        <div style={{ fontSize: '14px', fontWeight: '700', color: '#f8fafc' }}>{exp.description}</div>
+                        <div style={{ fontSize: '11px', color: '#94a3b8' }}>Paid by {exp.payer} • <span style={{ color: '#818cf8', fontWeight: '600' }}>{exp.category}</span></div>
                       </div>
-                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#059669' }}>₹{exp.amount}</div>
+                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#34d399' }}>₹{exp.amount}</div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '14px', border: '1px solid #cbd5e1' }}>
-                <h3 style={{ margin: '0 0 14px 0', fontSize: '16px', color: '#0f172a' }}>🗺️ Upcoming Itinerary</h3>
+              <div className="glass-card" style={{ padding: '20px' }}>
+                <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', color: '#fff', fontWeight: '700' }}>🗺️ Upcoming Itinerary</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {itinerary.map(item => (
-                    <div key={item.id} style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '12px 14px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
-                      <span style={{ backgroundColor: '#e0e7ff', color: '#4f46e5', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '800', flexShrink: 0 }}>{item.day}</span>
-                      <span style={{ fontSize: '13px', fontWeight: '600', color: '#334155' }}>{item.activity}</span>
+                    <div key={item.id} style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '12px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <span style={{ background: 'rgba(99, 102, 241, 0.2)', color: '#818cf8', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '800', flexShrink: 0, border: '1px solid rgba(99, 102, 241, 0.3)' }}>{item.day}</span>
+                      <span style={{ fontSize: '13px', fontWeight: '600', color: '#cbd5e1' }}>{item.activity}</span>
                     </div>
                   ))}
                 </div>
@@ -396,98 +559,127 @@ export default function App() {
           </div>
         )}
 
-        {/* 2. EXPENSE TRACKER & NATURAL LANGUAGE AI ENTRY */}
+        {/* 2. EXPENSE TRACKER WITH AI & OCR */}
         {activeTab === 'expenses' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             
-            {/* NATURAL LANGUAGE AI ENTRY BOX ( jueces ko impress karne wala feature ) */}
-            <div style={{ backgroundColor: '#fef3c7', padding: '20px', borderRadius: '14px', border: '1px solid #f59e0b' }}>
-              <h3 style={{ margin: '0 0 6px 0', fontSize: '16px', color: '#92400e' }}>✨ Natural Language AI Entry (Type & Auto-Add)</h3>
-              <p style={{ fontSize: '12px', color: '#b45309', margin: '0 0 12px 0' }}>Write in plain text e.g., *"Maine 1500 diye dinner ke liye Farman ko"*</p>
+            {/* AI TOP BOXES (Natural Language + OCR Receipt Scanner) */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
               
-              <form onSubmit={handleNaturalLanguageExpense} style={{ display: 'flex', gap: '10px' }}>
-                <input 
-                  type="text" 
-                  placeholder="Type naturally here..." 
-                  value={naturalText} 
-                  onChange={(e) => setNaturalText(e.target.value)}
-                  style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #f59e0b', fontSize: '14px', outline: 'none' }}
-                />
-                <button 
-                  type="submit" 
-                  disabled={nlLoading}
-                  style={{ backgroundColor: '#d97706', color: '#fff', border: 'none', padding: '0 20px', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '14px' }}
-                >
-                  {nlLoading ? 'Parsing...' : 'AI Add'}
-                </button>
-              </form>
+              {/* Natural Language Box */}
+              <div style={{ background: 'linear-gradient(135deg, rgba(217, 119, 6, 0.15) 0%, rgba(180, 83, 9, 0.05) 100%)', padding: '20px', borderRadius: '16px', border: '1px solid rgba(245, 158, 11, 0.3)', backdropFilter: 'blur(12px)' }}>
+                <h3 style={{ margin: '0 0 6px 0', fontSize: '15px', color: '#fbbf24', fontWeight: '700' }}>✨ Natural Language AI Entry</h3>
+                <p style={{ fontSize: '12px', color: '#fde68a', margin: '0 0 12px 0' }}>Type e.g., *"Maine 1500 diye dinner ke liye Farman ko"*</p>
+                <form onSubmit={handleNaturalLanguageExpense} style={{ display: 'flex', gap: '8px' }}>
+                  <input 
+                    type="text" 
+                    placeholder="Type naturally..." 
+                    value={naturalText} 
+                    onChange={(e) => setNaturalText(e.target.value)}
+                    className="custom-input"
+                    style={{ flex: 1, padding: '10px', fontSize: '13px' }}
+                  />
+                  <button 
+                    type="submit" 
+                    disabled={nlLoading}
+                    style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: '#fff', border: 'none', padding: '0 16px', borderRadius: '10px', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}
+                  >
+                    {nlLoading ? '...' : 'Add'}
+                  </button>
+                </form>
+              </div>
+
+              {/* OCR Receipt / Bill Scanner Box */}
+              <div style={{ background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.15) 0%, rgba(2, 132, 199, 0.05) 100%)', padding: '20px', borderRadius: '16px', border: '1px solid rgba(56, 189, 248, 0.3)', backdropFilter: 'blur(12px)' }}>
+                <h3 style={{ margin: '0 0 6px 0', fontSize: '15px', color: '#38bdf8', fontWeight: '700' }}>🧾 Smart Receipt / Bill OCR</h3>
+                <p style={{ fontSize: '12px', color: '#bae6fd', margin: '0 0 12px 0' }}>Upload image/bill to auto-extract amount & items</p>
+                
+                <label style={{ 
+                  display: 'inline-block', 
+                  background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)', 
+                  color: '#fff', 
+                  padding: '10px 18px', 
+                  borderRadius: '10px', 
+                  fontWeight: '700', 
+                  fontSize: '13px', 
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(14, 165, 233, 0.3)'
+                }}>
+                  {ocrLoading ? 'Scanning Bill with AI...' : '📁 Upload Bill / Receipt'}
+                  <input type="file" accept="image/*" onChange={handleReceiptUpload} style={{ display: 'none' }} />
+                </label>
+              </div>
+
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
-              <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '14px', border: '1px solid #cbd5e1', height: 'fit-content' }}>
-                <h3 style={{ margin: '0 0 14px 0', fontSize: '16px', color: '#0f172a' }}>➕ Manual Expense Form</h3>
-                <form onSubmit={handleAddExpense} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div className="glass-card" style={{ padding: '24px', height: 'fit-content' }}>
+                <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', color: '#fff', fontWeight: '700' }}>➕ Manual Expense Form</h3>
+                <form onSubmit={handleAddExpense} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   <input 
                     type="text" 
                     placeholder="Description (e.g. Dinner at Cafe)" 
                     value={newExpDesc} 
                     onChange={(e) => setNewExpDesc(e.target.value)}
-                    style={{ padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px' }}
+                    className="custom-input"
+                    style={{ padding: '12px', fontSize: '14px' }}
                   />
                   <input 
                     type="number" 
                     placeholder="Amount (₹)" 
                     value={newExpAmount} 
                     onChange={(e) => setNewExpAmount(e.target.value)}
-                    style={{ padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px' }}
+                    className="custom-input"
+                    style={{ padding: '12px', fontSize: '14px' }}
                   />
                   <select 
                     value={newExpPayer} 
                     onChange={(e) => setNewExpPayer(e.target.value)}
-                    style={{ padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px' }}
+                    className="custom-input"
+                    style={{ padding: '12px', fontSize: '14px' }}
                   >
-                    <option value="">Select Payer</option>
-                    {memberList.map((m, i) => <option key={i} value={m}>{m}</option>)}
+                    <option value="" style={{ background: '#0f172a' }}>Select Payer</option>
+                    {memberList.map((m, i) => <option key={i} value={m} style={{ background: '#0f172a' }}>{m}</option>)}
                   </select>
                   <select 
                     value={newExpCat} 
                     onChange={(e) => setNewExpCat(e.target.value)}
-                    style={{ padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px' }}
+                    className="custom-input"
+                    style={{ padding: '12px', fontSize: '14px' }}
                   >
-                    <option value="Food">Food</option>
-                    <option value="Transport">Transport</option>
-                    <option value="Lodging">Lodging</option>
-                    <option value="Activities">Activities</option>
-                    <option value="General">General</option>
+                    <option value="Food" style={{ background: '#0f172a' }}>Food</option>
+                    <option value="Transport" style={{ background: '#0f172a' }}>Transport</option>
+                    <option value="Lodging" style={{ background: '#0f172a' }}>Lodging</option>
+                    <option value="Activities" style={{ background: '#0f172a' }}>Activities</option>
+                    <option value="General" style={{ background: '#0f172a' }}>General</option>
                   </select>
-                  <button type="submit" style={{ backgroundColor: '#4f46e5', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '14px' }}>Add Expense</button>
+                  <button type="submit" style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: '#fff', border: 'none', padding: '12px', borderRadius: '10px', fontWeight: '700', cursor: 'pointer', fontSize: '14px', boxShadow: '0 4px 12px rgba(79, 70, 229, 0.4)' }}>Add Expense</button>
                 </form>
               </div>
 
-              <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '14px', border: '1px solid #cbd5e1' }}>
-                <h3 style={{ margin: '0 0 14px 0', fontSize: '16px', color: '#0f172a' }}>💸 All Expenses Record</h3>
+              <div className="glass-card" style={{ padding: '24px' }}>
+                <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', color: '#fff', fontWeight: '700' }}>💸 All Expenses Record</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {expenses.map(exp => (
-                    <div key={exp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                    <div key={exp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
                       <div>
-                        <strong style={{ fontSize: '14px', color: '#1e293b' }}>{exp.description}</strong>
-                        <span style={{ display: 'block', fontSize: '12px', color: '#64748b' }}>Paid by <b>{exp.payer}</b> • <span style={{ color: '#4f46e5', fontWeight: '600' }}>{exp.category || 'General'}</span></span>
+                        <strong style={{ fontSize: '14px', color: '#f8fafc' }}>{exp.description}</strong>
+                        <span style={{ display: 'block', fontSize: '12px', color: '#94a3b8' }}>Paid by <b>{exp.payer}</b> • <span style={{ color: '#818cf8', fontWeight: '600' }}>{exp.category || 'General'}</span></span>
                       </div>
-                      <span style={{ fontSize: '16px', fontWeight: '800', color: '#059669' }}>₹{exp.amount}</span>
+                      <span style={{ fontSize: '16px', fontWeight: '800', color: '#34d399' }}>₹{exp.amount}</span>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
-
           </div>
         )}
 
-        {/* 3. SETTLEMENT & SPLIT */}
+        {/* 3. SETTLEMENT */}
         {activeTab === 'settlement' && (
-          <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '14px', border: '1px solid #cbd5e1', maxWidth: '700px' }}>
-            <h3 style={{ margin: '0 0 6px 0', fontSize: '18px', color: '#0f172a' }}>⚖️ Settlement & Bill Split</h3>
-            <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '20px' }}>Total Expense: <b>₹{totalExpense}</b> | Individual Share: <b>₹{perPersonShare.toFixed(2)}</b></p>
+          <div className="glass-card" style={{ padding: '28px', maxWidth: '700px' }}>
+            <h3 style={{ margin: '0 0 6px 0', fontSize: '18px', color: '#fff', fontWeight: '700' }}>⚖️ Settlement & Bill Split</h3>
+            <p style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '20px' }}>Total Expense: <b style={{ color: '#fff' }}>₹{totalExpense}</b> | Individual Share: <b style={{ color: '#818cf8' }}>₹{perPersonShare.toFixed(2)}</b></p>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {memberList.map((m, idx) => {
@@ -496,13 +688,13 @@ export default function App() {
                 const isGet = balance >= 0;
 
                 return (
-                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
                     <div>
-                      <strong style={{ fontSize: '15px', color: '#1e293b' }}>{m}</strong>
-                      <span style={{ display: 'block', fontSize: '12px', color: '#64748b' }}>Total Paid: ₹{paid}</span>
+                      <strong style={{ fontSize: '15px', color: '#f8fafc' }}>{m}</strong>
+                      <span style={{ display: 'block', fontSize: '12px', color: '#94a3b8' }}>Total Paid: ₹{paid}</span>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <span style={{ fontSize: '15px', fontWeight: '800', color: isGet ? '#059669' : '#dc2626' }}>
+                      <span style={{ fontSize: '15px', fontWeight: '800', color: isGet ? '#34d399' : '#f87171' }}>
                         {isGet ? `Gets Back ₹${balance.toFixed(2)}` : `Owes ₹${Math.abs(balance).toFixed(2)}`}
                       </span>
                     </div>
@@ -516,34 +708,36 @@ export default function App() {
         {/* 4. ITINERARY */}
         {activeTab === 'itinerary' && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
-            <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '14px', border: '1px solid #cbd5e1', height: 'fit-content' }}>
-              <h3 style={{ margin: '0 0 14px 0', fontSize: '16px', color: '#0f172a' }}>➕ Add Activity</h3>
-              <form onSubmit={handleAddItinerary} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="glass-card" style={{ padding: '24px', height: 'fit-content' }}>
+              <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', color: '#fff', fontWeight: '700' }}>➕ Add Activity</h3>
+              <form onSubmit={handleAddItinerary} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <input 
                   type="text" 
                   placeholder="Day (e.g. Day 4)" 
                   value={newDay} 
                   onChange={(e) => setNewDay(e.target.value)}
-                  style={{ padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px' }}
+                  className="custom-input"
+                  style={{ padding: '12px', fontSize: '14px' }}
                 />
                 <input 
                   type="text" 
                   placeholder="Activity Details" 
                   value={newActivity} 
                   onChange={(e) => setNewActivity(e.target.value)}
-                  style={{ padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px' }}
+                  className="custom-input"
+                  style={{ padding: '12px', fontSize: '14px' }}
                 />
-                <button type="submit" style={{ backgroundColor: '#0284c7', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '14px' }}>Add Activity</button>
+                <button type="submit" style={{ background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)', color: '#fff', border: 'none', padding: '12px', borderRadius: '10px', fontWeight: '700', cursor: 'pointer', fontSize: '14px', boxShadow: '0 4px 12px rgba(14, 165, 233, 0.4)' }}>Add Activity</button>
               </form>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '14px', border: '1px solid #cbd5e1' }}>
-              <h3 style={{ margin: '0 0 14px 0', fontSize: '16px', color: '#0f172a' }}>🗺️ Full Trip Itinerary</h3>
+            <div className="glass-card" style={{ padding: '24px' }}>
+              <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', color: '#fff', fontWeight: '700' }}>🗺️ Full Trip Itinerary</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {itinerary.map(item => (
-                  <div key={item.id} style={{ display: 'flex', gap: '14px', alignItems: 'center', padding: '14px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ backgroundColor: '#4f46e5', color: '#ffffff', padding: '6px 10px', borderRadius: '8px', fontSize: '12px', fontWeight: '800' }}>{item.day}</span>
-                    <span style={{ fontSize: '14px', fontWeight: '600', color: '#1e293b' }}>{item.activity}</span>
+                  <div key={item.id} style={{ display: 'flex', gap: '14px', alignItems: 'center', padding: '14px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <span style={{ background: '#4f46e5', color: '#ffffff', padding: '6px 10px', borderRadius: '8px', fontSize: '12px', fontWeight: '800' }}>{item.day}</span>
+                    <span style={{ fontSize: '14px', fontWeight: '600', color: '#cbd5e1' }}>{item.activity}</span>
                   </div>
                 ))}
               </div>
@@ -553,48 +747,25 @@ export default function App() {
 
         {/* 5. SETTINGS */}
         {activeTab === 'settings' && (
-          <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '14px', border: '1px solid #cbd5e1', maxWidth: '700px' }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', color: '#0f172a' }}>⚙️ Trip Configuration & AI Assistant</h3>
+          <div className="glass-card" style={{ padding: '28px', maxWidth: '700px' }}>
+            <h3 style={{ margin: '0 0 6px 0', fontSize: '18px', color: '#fff', fontWeight: '700' }}>⚙️ Gemini API Configuration</h3>
+            <p style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '20px' }}>Enter your Gemini API key once to unlock AI OCR Receipt scanning and AI Trip Planning.</p>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label style={{ fontSize: '12px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '6px' }}>Destination / Trip Name</label>
+                <label style={{ fontSize: '12px', fontWeight: '700', color: '#cbd5e1', display: 'block', marginBottom: '6px' }}>Gemini API Key</label>
                 <input 
-                  type="text" 
-                  value={tripName} 
-                  onChange={(e) => setTripName(e.target.value)}
-                  placeholder="e.g. Goa, Manali, Ladakh"
-                  style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '14px' }}
+                  type="password" 
+                  value={apiKey} 
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder="Paste your AI Studio API key here"
+                  className="custom-input"
+                  style={{ width: '100%', padding: '12px', boxSizing: 'border-box', fontSize: '14px' }}
                 />
               </div>
-
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '6px' }}>Group Members (Comma Separated)</label>
-                <input 
-                  type="text" 
-                  value={members} 
-                  onChange={(e) => setMembers(e.target.value)}
-                  style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '14px' }}
-                />
+              <div style={{ background: 'rgba(52, 211, 153, 0.1)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(52, 211, 153, 0.2)', color: '#34d399', fontSize: '12px', fontWeight: '600' }}>
+                ✅ Key saved automatically in browser localStorage!
               </div>
-
-              <button 
-                onClick={handleGenerateAI}
-                disabled={aiLoading}
-                style={{
-                  backgroundColor: '#0284c7',
-                  color: '#ffffff',
-                  border: 'none',
-                  padding: '14px',
-                  borderRadius: '10px',
-                  fontWeight: '800',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  marginTop: '10px'
-                }}
-              >
-                {aiLoading ? '✨ Generating Smart Plan...' : '✨ Auto-Generate AI Itinerary & Expenses'}
-              </button>
             </div>
           </div>
         )}
