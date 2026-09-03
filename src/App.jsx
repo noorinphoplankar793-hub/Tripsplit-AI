@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 // =========================================================
-// 🔑 APNI GEMINI API KEY NICHE DAAL DO:
+// 🔑 APNI GEMINI API KEY NICHE QUOTES KE ANDAR PASTE KARO:
 // =========================================================
 const HARDCODED_GEMINI_API_KEY = "AQ.Ab8RN6JSi4GMXv6C7wDbFGA_2YiHY5dRpZ3LGg5p8NGFfRN9QA"; 
 
@@ -10,11 +10,11 @@ export default function App() {
   const [userName] = useState('Ayaan');
   
   // Trip State
-  const [tripName, setTripName] = useState('Kasol');
+  const [tripName, setTripName] = useState('Kasol Trip 2026');
   const [members, setMembers] = useState('Farman, Zaid, Jack, Nathan');
   const [aiLoading, setAiLoading] = useState(false);
 
-  // Default Data
+  // Data State
   const [expenses, setExpenses] = useState([
     { id: 1, description: 'Hotel Stay & Resort', amount: 8500, payer: 'Farman' },
     { id: 2, description: 'Food & Cafe Hopping', amount: 3200, payer: 'Zaid' },
@@ -27,16 +27,50 @@ export default function App() {
     { id: 3, day: 'Day 3', activity: 'Sightseeing & Return Journey' }
   ]);
 
-  // AUTO GEMINI AI FUNCTION (NO MANUAL API KEY INPUT REQUIRED)
+  // Form States for Adding Items Manually
+  const [newExpDesc, setNewExpDesc] = useState('');
+  const [newExpAmount, setNewExpAmount] = useState('');
+  const [newExpPayer, setNewExpPayer] = useState('');
+
+  const [newDay, setNewDay] = useState('');
+  const [newActivity, setNewActivity] = useState('');
+
+  // Handlers for Manual Add
+  const handleAddExpense = (e) => {
+    e.preventDefault();
+    if (!newExpDesc || !newExpAmount || !newExpPayer) return;
+    setExpenses([...expenses, {
+      id: Date.now(),
+      description: newExpDesc,
+      amount: parseFloat(newExpAmount),
+      payer: newExpPayer
+    }]);
+    setNewExpDesc('');
+    setNewExpAmount('');
+    setNewExpPayer('');
+  };
+
+  const handleAddItinerary = (e) => {
+    e.preventDefault();
+    if (!newDay || !newActivity) return;
+    setItinerary([...itinerary, {
+      id: Date.now(),
+      day: newDay,
+      activity: newActivity
+    }]);
+    setNewDay('');
+    setNewActivity('');
+  };
+
+  // AUTO GEMINI AI FUNCTION
   const handleGenerateAI = async () => {
     if (!tripName.trim()) {
-      alert('Pehle Destination / Place ka naam daalo!');
+      alert('Pehle Destination / Trip Name daalo!');
       return;
     }
 
     setAiLoading(true);
 
-    // Fallback if key is not pasted in code
     if (!HARDCODED_GEMINI_API_KEY || HARDCODED_GEMINI_API_KEY === "PASTE_YOUR_GEMINI_API_KEY_HERE") {
       setTimeout(() => {
         setItinerary([
@@ -45,18 +79,18 @@ export default function App() {
           { id: 3, day: 'Day 3', activity: `Souvenir Shopping & Return Journey from ${tripName}` }
         ]);
         setExpenses([
-          { id: Date.now() + 1, description: `${tripName} Hotel Stay`, amount: 7500, payer: 'Ayaan' },
-          { id: Date.now() + 2, description: `${tripName} Food & Travel`, amount: 4200, payer: 'Farman' }
+          { id: Date.now() + 1, description: `${tripName} Resort Stay`, amount: 9000, payer: 'Farman' },
+          { id: Date.now() + 2, description: `${tripName} Local Food & Cafe`, amount: 3500, payer: 'Zaid' },
+          { id: Date.now() + 3, description: 'Travel Expenses', amount: 4500, payer: 'Jack' }
         ]);
         setAiLoading(false);
-        alert(`✨ AI Plan Generated for ${tripName}! (Code me API key paste karoge toh live Gemini run hoga)`);
+        alert(`✨ Plan generated for ${tripName}! (Key paste karoge toh live Gemini AI se aayega)`);
       }, 1000);
       return;
     }
 
-    // Real Live Gemini API Call using Code Key
     try {
-      const prompt = `Create a realistic travel budget and 3-day itinerary for a trip to "${tripName}". Return ONLY a raw JSON object with no markdown formatting like this exact schema:
+      const prompt = `Create a realistic travel budget and 3-day itinerary for a trip to "${tripName}". Return ONLY raw JSON object with this exact schema:
       {
         "expenses": [
           {"description": "Hotel Stay", "amount": 8000, "payer": "Farman"},
@@ -82,19 +116,31 @@ export default function App() {
       if (cleanJson.expenses && cleanJson.itinerary) {
         setExpenses(cleanJson.expenses.map((e, i) => ({ ...e, id: Date.now() + i })));
         setItinerary(cleanJson.itinerary.map((i, idx) => ({ ...i, id: Date.now() + idx + 10 })));
-        alert(`🔥 Live Gemini AI Response for ${tripName} loaded!`);
+        alert(`🔥 Live Gemini AI Plan for ${tripName} loaded across all tabs!`);
       }
     } catch (err) {
       console.error(err);
-      alert('API Error! Check if your API Key in the code is valid.');
+      alert('API Error! Check your Gemini API key in the code.');
     } finally {
       setAiLoading(false);
     }
   };
 
+  // Split Calculations
   const totalExpense = expenses.reduce((acc, curr) => acc + curr.amount, 0);
   const memberList = members.split(',').map(m => m.trim()).filter(Boolean);
   const perPersonShare = totalExpense / (memberList.length || 1);
+
+  // Paid per member
+  const memberPaid = {};
+  memberList.forEach(m => { memberPaid[m] = 0; });
+  expenses.forEach(exp => {
+    if (memberPaid[exp.payer] !== undefined) {
+      memberPaid[exp.payer] += exp.amount;
+    } else {
+      memberPaid[exp.payer] = exp.amount;
+    }
+  });
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#e2e8f0', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
@@ -158,11 +204,9 @@ export default function App() {
           </div>
         </header>
 
-        {/* DASHBOARD TAB */}
+        {/* 1. DASHBOARD TAB */}
         {activeTab === 'dashboard' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            
-            {/* STAT CARDS */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
               <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '16px', border: '1px solid #cbd5e1', textAlign: 'center' }}>
                 <span style={{ fontSize: '11px', fontWeight: '700', color: '#64748b' }}>TOTAL EXPENSE</span>
@@ -178,9 +222,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* EXPENSES & ITINERARY */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-              
               <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '16px', border: '1px solid #cbd5e1' }}>
                 <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', color: '#0f172a' }}>💸 Recent Expenses</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -207,12 +249,128 @@ export default function App() {
                   ))}
                 </div>
               </div>
-
             </div>
           </div>
         )}
 
-        {/* SETTINGS TAB */}
+        {/* 2. EXPENSE TRACKER TAB */}
+        {activeTab === 'expenses' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '16px', border: '1px solid #cbd5e1' }}>
+              <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', color: '#0f172a' }}>➕ Add New Expense</h3>
+              <form onSubmit={handleAddExpense} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '12px', alignItems: 'center' }}>
+                <input 
+                  type="text" 
+                  placeholder="Description (e.g. Dinner, Fuel)" 
+                  value={newExpDesc} 
+                  onChange={(e) => setNewExpDesc(e.target.value)}
+                  style={{ padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontWeight: '600' }}
+                />
+                <input 
+                  type="number" 
+                  placeholder="Amount (₹)" 
+                  value={newExpAmount} 
+                  onChange={(e) => setNewExpAmount(e.target.value)}
+                  style={{ padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontWeight: '600' }}
+                />
+                <select 
+                  value={newExpPayer} 
+                  onChange={(e) => setNewExpPayer(e.target.value)}
+                  style={{ padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontWeight: '600' }}
+                >
+                  <option value="">Who Paid?</option>
+                  {memberList.map((m, i) => <option key={i} value={m}>{m}</option>)}
+                </select>
+                <button type="submit" style={{ backgroundColor: '#4f46e5', color: '#fff', border: 'none', padding: '12px 20px', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}>Add Expense</button>
+              </form>
+            </div>
+
+            <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '16px', border: '1px solid #cbd5e1' }}>
+              <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', color: '#0f172a' }}>💸 All Expenses</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {expenses.map(exp => (
+                  <div key={exp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                    <div>
+                      <strong style={{ fontSize: '15px', color: '#1e293b' }}>{exp.description}</strong>
+                      <span style={{ display: 'block', fontSize: '12px', color: '#64748b' }}>Paid by <b>{exp.payer}</b></span>
+                    </div>
+                    <span style={{ fontSize: '18px', fontWeight: '800', color: '#059669' }}>₹{exp.amount}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 3. SETTLEMENT & SPLIT TAB */}
+        {activeTab === 'settlement' && (
+          <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '16px', border: '1px solid #cbd5e1' }}>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', color: '#0f172a' }}>⚖️ Group Settlement Summary</h3>
+            <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '20px' }}>Total Expense: <b>₹{totalExpense}</b> | Per Person Share: <b>₹{perPersonShare.toFixed(2)}</b></p>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {memberList.map((m, idx) => {
+                const paid = memberPaid[m] || 0;
+                const balance = paid - perPersonShare;
+                const isGet = balance >= 0;
+
+                return (
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <div>
+                      <strong style={{ fontSize: '16px', color: '#1e293b' }}>{m}</strong>
+                      <span style={{ display: 'block', fontSize: '12px', color: '#64748b' }}>Total Paid: ₹{paid}</span>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: '16px', fontWeight: '800', color: isGet ? '#059669' : '#dc2626' }}>
+                        {isGet ? `Gets Back ₹${balance.toFixed(2)}` : `Owes ₹${Math.abs(balance).toFixed(2)}`}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* 4. TRIP ITINERARY TAB */}
+        {activeTab === 'itinerary' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '16px', border: '1px solid #cbd5e1' }}>
+              <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', color: '#0f172a' }}>➕ Add Custom Day Activity</h3>
+              <form onSubmit={handleAddItinerary} style={{ display: 'grid', gridTemplateColumns: '1fr 3fr auto', gap: '12px' }}>
+                <input 
+                  type="text" 
+                  placeholder="Day (e.g. Day 4)" 
+                  value={newDay} 
+                  onChange={(e) => setNewDay(e.target.value)}
+                  style={{ padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontWeight: '600' }}
+                />
+                <input 
+                  type="text" 
+                  placeholder="Activity Details" 
+                  value={newActivity} 
+                  onChange={(e) => setNewActivity(e.target.value)}
+                  style={{ padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontWeight: '600' }}
+                />
+                <button type="submit" style={{ backgroundColor: '#0284c7', color: '#fff', border: 'none', padding: '12px 20px', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}>Add Activity</button>
+              </form>
+            </div>
+
+            <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '16px', border: '1px solid #cbd5e1' }}>
+              <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', color: '#0f172a' }}>🗺️ Full Itinerary</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {itinerary.map(item => (
+                  <div key={item.id} style={{ display: 'flex', gap: '16px', alignItems: 'center', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <span style={{ backgroundColor: '#4f46e5', color: '#ffffff', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '800' }}>{item.day}</span>
+                    <span style={{ fontSize: '14px', fontWeight: '600', color: '#1e293b' }}>{item.activity}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 5. SETTINGS TAB */}
         {activeTab === 'settings' && (
           <div style={{ backgroundColor: '#ffffff', padding: '28px', borderRadius: '18px', border: '1px solid #cbd5e1', maxWidth: '600px' }}>
             <h3 style={{ margin: '0 0 20px 0', fontSize: '18px', color: '#0f172a' }}>⚙️ Trip Configuration & AI Planner</h3>
